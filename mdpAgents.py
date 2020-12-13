@@ -37,7 +37,7 @@ DIRECTION_VECTORS = {Directions.NORTH: (0,1), Directions.SOUTH: (0, -1), Directi
 EPSILON = 0.01
 GHOST_VALUE = -10.0
 DEADEND_VALUE = -50.0
-FOOD_VALUE = 3.0
+FOOD_VALUE = 2.0
 EMPTY_VALUE = 0.0
 DISCOUNT = 0.6
 GHOST_RANGE = 12
@@ -45,14 +45,20 @@ ITERATIONS = 10
 
 class MDPAgent(Agent):
 
-    def test(self, ghost_value=50, ghost_range=12):
+    def test(self, ghost_value=50, ghost_range=12, food_value=1, empty_value=0, discount=0.6):
         """
         Method for modifying of global variables for testing purposes
         """
         global GHOST_VALUE
         global GHOST_RANGE
+        global FOOD_VALUE
+        global EMPTY_VALUE
+        global DISCOUNT
         GHOST_VALUE = ghost_value
         GHOST_RANGE = ghost_range
+        FOOD_VALUE = food_value
+        EMPTY_VALUE = empty_value
+        DISCOUNT = discount
 
     def __init__(self):
         """

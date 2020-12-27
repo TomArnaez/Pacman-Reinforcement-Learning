@@ -1,5 +1,4 @@
 # sampleAgents.py
-# parsons/07-oct-2017
 #
 # Version 1.1
 #
@@ -35,17 +34,19 @@ import util
 
 DIRECTION_VECTORS = {Directions.NORTH: (0,1), Directions.SOUTH: (0, -1), Directions.EAST: (1, 0), Directions.WEST: (-1, 0)}
 EPSILON = 0.01
-GHOST_VALUE = -10.0
-DEADEND_VALUE = -50.0
-FOOD_VALUE = 2.0
+GHOST_VALUE = -5.0
+DEADEND_VALUE = -10.0
+FOOD_VALUE = 1.0
 EMPTY_VALUE = 0.0
-DISCOUNT = 0.6
+DISCOUNT = 0.9
 GHOST_RANGE = 12
 ITERATIONS = 10
 
+# ghost_value=-5, deadend = -10, food=1, disc = 0.9, ghost_range = 12 for 77% over 20000
+
 class MDPAgent(Agent):
 
-    def test(self, ghost_value=50, ghost_range=12, food_value=1, empty_value=0, discount=0.6):
+    def test(self, ghost_value=50, ghost_range=12, food_value=1, empty_value=0, discount=0.6, deadend_value = -50.0):
         """
         Method for modifying of global variables for testing purposes
         """
@@ -54,11 +55,13 @@ class MDPAgent(Agent):
         global FOOD_VALUE
         global EMPTY_VALUE
         global DISCOUNT
+        global DEADEND_VALUE
         GHOST_VALUE = ghost_value
         GHOST_RANGE = ghost_range
         FOOD_VALUE = food_value
         EMPTY_VALUE = empty_value
         DISCOUNT = discount
+        DEADEND_VALUE = deadend_value
 
     def __init__(self):
         """
@@ -75,21 +78,21 @@ class MDPAgent(Agent):
         @param state: The current pacman game state.
         """
 
-        # Set constant world values
+        # Set constant world values.
         self.corners = api.corners(state)
         self.walls = api.walls(state)
 
-        # Calculate the width and height using the corners
+        # Calculate the width and height using the corners.
         from operator import itemgetter
         self.height = max(self.corners, key=itemgetter(1))[1] + 1
         self.width= max(self.corners, key=itemgetter(0))[0] + 1
 
-        # Holds the set of all reachable locations
+        # Holds the set of all reachable locations.
         self.valid_locations = set((x, y) for x in range(self.width) for y in range(self.height) if (x, y) not in self.walls)
 
     def buildMap(self, state):
         """ 
-        Builds a map of the current game world via calls to the api
+        Builds an internal representation of the current game world using information gained from calls to the api
 
         @param state: The current game state.
         """
@@ -114,7 +117,7 @@ class MDPAgent(Agent):
 
     def setRewards(self):
         """
-        Populates the reward dictionary with the reward value each state
+        Initializes the dictionary which will hold the reward value for each state.
         """
 
         self.rewards = {pos : EMPTY_VALUE for pos in self.valid_locations}
@@ -123,37 +126,41 @@ class MDPAgent(Agent):
 
     def ghostRewardValues(self):
         """
-        Uses a depth-limited breadth-first search to calculate decaying ghost reward values
+        Returns the reward values for locations relevant to ghosts.
+        Uses a depth-limited breadth-first search to calculate reward values that are inversely proportional to the distance of nearby ghosts.
 
         @returns dict: The reward values for positions
         """
-        positions = {}
+        ghost_state_rewards = {}
 
         for ghost in self.ghosts:
+            # TODO: Explain queues
             active_queue = util.Queue()
             inactive_queue = util.Queue()
             active_queue.push(ghost)
-            counter = 1
-            while counter < GHOST_RANGE:
+
+            #while counter < GHOST_RANGE:
+            for counter in range(1, GHOST_RANGE):
                 while active_queue.isEmpty() is False:
                     pos = active_queue.pop()
                     next_locs = self.getLegalMoves(pos)[1]
-
-                    
-                    positions[pos] = self.rewards[pos] + GHOST_VALUE * (1.0 / counter)
-                    #if (len(next_locs) == 1) and (len(self.food) > 1) and (util.manhattanDistance(self.pacman, pos) > 1):
-                        #print("deadend", util.manhattanDistance(self.pacman, pos))
-                        #positions[pos] = self.rewards[pos] + (GHOST_VALUE + DEADEND_VALUE) * (1.0 / counter)
-                    #else:
-                        #positions[pos] = self.rewards[pos] + GHOST_VALUE * (1.0 / counter)
+                    reward_value = self.rewards[pos] + GHOST_VALUE * (1.0 / counter)
+                    # If there is already a reward for this position we check if the newly calculated reward is more significant before overwriting it.
+                    if pos not in ghost_state_rewards.keys() or ghost_state_rewards[pos] > reward_value:
+                        ghost_state_rewards[pos] = reward_value
+                    #positions[pos] = self.rewards[pos] + GHOST_VALUE * (1.0 / counter)
+                    # if (len(next_locs) == 1) and (len(self.food) > 1) and (util.manhattanDistance(self.pacman, pos) > 1):
+                    #     #print("deadend", util.manhattanDistance(self.pacman, pos))
+                    #     positions[pos] = self.rewards[pos] + (GHOST_VALUE + DEADEND_VALUE) * (1.0 / counter)
+                    # else:
+                    #     positions[pos] = self.rewards[pos] + GHOST_VALUE * (1.0 / counter)
 
                     for loc in next_locs:
-                        if loc not in positions.keys():
-                            inactive_queue.push(loc)
+                        inactive_queue.push(loc)
+                    #    if loc not in positions.keys():
                 # Swap the queues
                 inactive_queue, active_queue = active_queue, inactive_queue
-                counter += 1
-        return positions
+        return ghost_state_rewards
 
     def setNeighbours(self):
         """
@@ -162,13 +169,15 @@ class MDPAgent(Agent):
         for location in self.valid_locations:
             moves = {}
             for direction in DIRECTION_VECTORS:
-                (x, y) = DIRECTION_VECTORS[direction]
-                move = (location[0] + x, location[1] + y)
-                # If we hit a wall, bounce back
+                # Calculate the resulting location from a move in this direction.
+                move = self.moveInDirection(location, direction)
+
+                # If we move into a wall we bounce back to the original position.
                 if move in self.walls:
                     move = location
                 moves[direction] = move
 
+            # For each action we set the result of moving in the intended direction as index 0, and possible unintended directions as indexes 1 and 2.
             moves_dict = {
                     Directions.NORTH: [moves[Directions.NORTH], moves[Directions.EAST], moves[Directions.WEST]],
                     Directions.SOUTH: [moves[Directions.SOUTH], moves[Directions.EAST], moves[Directions.WEST]],
@@ -179,37 +188,50 @@ class MDPAgent(Agent):
             self.stateNeighbours[location] = moves_dict
     
     def getLegalMoves(self, location):
+        """
+        @param location: where to move from
+        @returns list: legal moves for a direction
+        """
         legal_moves = []
         locations = []
         for direction in DIRECTION_VECTORS:
-            (x, y) = DIRECTION_VECTORS[direction]
-            new_location = (location[0] + x, location[1] + y)
+            new_location = self.moveInDirection(location, direction)
+
             if new_location in self.valid_locations:
                 legal_moves.append(direction)
                 locations.append(new_location)
         return (legal_moves, locations)
+
+    def moveInDirection(self, location, direction):
+        (deltaX, deltaY) = DIRECTION_VECTORS[direction]
+        return (location[0] + deltaX, location[1] + deltaY)
 
     def modifiedPolicyIteration(self):
         """
         Repeats the bellman's equation a set number of times to calculate utilities for each valid location
         """
 
-        # Set initial utilities to zero
+        # Set initial utilities to zero.
         self.utilities = {location: 0 for location in self.valid_locations}
 
-        # Start with random policy
+        # Start with random policies for each state.
         self.policies = {location: random.choice(self.getLegalMoves(location)[0]) for location in self.valid_locations}
+    
+        # We need to retain a copy of all old utilities values to be used for calculating expected values for new utilities.
         import copy
         new_utilities = copy.deepcopy(self.utilities)
+
+        # We iterate so long as there is significant (> epsilon) change.
         changed = True
         while changed:
             changed = False 
-
-          # Perform approx bellmans
+          # Perform approximate bellmans.
             for i in range(ITERATIONS):
                 for location in self.valid_locations:
                     neighbours = self.stateNeighbours[location]
                     policy = self.policies[location]
+
+                    # Stopping is a deterministic action so we just use the current location's utility.
                     if (policy is Directions.STOP):
                         expectedValue = self.utilities[location]
                     else:
@@ -226,6 +248,8 @@ class MDPAgent(Agent):
                         move: 0.8 * new_utilities[neighbours[move][0]] + 0.1 * new_utilities[neighbours[move][1]] + 0.1 * new_utilities[neighbours[move][2]] for move in moves
                         }
                 expectedValues[Directions.STOP] = new_utilities[location]
+
+                # Get the argument (policy) that results in the highest expected value.
                 values = list(expectedValues.values())
                 max_value = max(values)
                 new_policy = list(expectedValues.keys())[values.index(max_value)]

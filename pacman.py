@@ -1,5 +1,5 @@
 # Improved Frederik Mallmann-Trenn
-# pacman.py
+
 # ---------
 # Licensing Information:  You are free to use or extend these projects for
 # educational purposes provided that (1) you do not distribute or publish
@@ -46,9 +46,6 @@ from game import Directions
 from game import Actions
 from util import nearestPoint
 from util import manhattanDistance
-from IPython.display import display as disp
-from multiprocessing import Pool, Manager
-import pandas
 import util, layout
 import sys, types, time, random, os
 
@@ -296,17 +293,17 @@ class ClassicGameRules:
 
 
     def win( self, state, game ):
-        #if not self.quiet: print "#Pacman emerges victorious! Score: %d" % state.data.score
+        if not self.quiet: print "#Pacman emerges victorious! Score: %d" % state.data.score
         game.gameOver = True
         self.winssofar +=1
-        #if not self.quiet: print "#Wins so far: %d" % self.winssofar
-        #if not self.quiet: print "-----------------------"
+        if not self.quiet: print "#Wins so far: %d" % self.winssofar
+        if not self.quiet: print "-----------------------"
 
     def lose( self, state, game ):
-        #if not self.quiet: print "#Pacman died! Score: %d" % state.data.score
+        if not self.quiet: print "#Pacman died! Score: %d" % state.data.score
         game.gameOver = True
-        #if not self.quiet: print "#Wins so far: %d" % self.winssofar
-        #if not self.quiet: print "-----------------------"
+        if not self.quiet: print "#Wins so far: %d" % self.winssofar
+        if not self.quiet: print "-----------------------"
 
     def getProgress(self, game):
         return float(game.state.getNumFood()) / self.initialState.getNumFood()
@@ -637,8 +634,7 @@ def replayGame( layout, actions, display ):
 
     display.finish()
 
-def runGames( layout, pacman, ghosts, display, numGames, record, data_list=None, numTraining = 0, catchExceptions=False, timeout=30, ghost_value=-50, ghost_range=12, food_value=1, empty_value=1, discount=0.5):
-    pacman.test(ghost_value=ghost_value, ghost_range = ghost_range, food_value=food_value, empty_value=empty_value, discount=discount)
+def runGames( layout, pacman, ghosts, display, numGames, record, numTraining = 0, catchExceptions=False, timeout=30 ):
     import __main__
     __main__.__dict__['_display'] = display
 
@@ -659,27 +655,24 @@ def runGames( layout, pacman, ghosts, display, numGames, record, data_list=None,
         game.run()
         if not beQuiet: games.append(game)
 
+        if record:
+            import time, cPickle
+            fname = ('recorded-game-%d' % (i + 1)) +  '-'.join([str(t) for t in time.localtime()[1:6]])
+            f = file(fname, 'w')
+            components = {'layout': layout, 'actions': game.moveHistory}
+            cPickle.dump(components, f)
+            f.close()
+
     if (numGames-numTraining) > 0:
         scores = [game.state.getScore() for game in games]
         wins = [game.state.isWin() for game in games]
         winRate = wins.count(True)/ float(len(wins))
-        data_list.append(pandas.DataFrame({'ghost_value': [ghost_value], 'ghost_range':[ghost_range], 'food_value' : [food_value], 'empty_value':[empty_value], 'discount':[discount], 'winrate': [winRate]}))
-        # print 'Average Score:', sum(scores) / float(len(scores))
-        # print 'Scores:       ', ', '.join([str(score) for score in scores])
-        # print 'Win Rate:      %d/%d (%.2f)' % (wins.count(True), len(wins), winRate)
-        # print 'Record:       ', ', '.join([ ['Loss', 'Win'][int(w)] for w in wins])
+        print 'Average Score:', sum(scores) / float(len(scores))
+        print 'Scores:       ', ', '.join([str(score) for score in scores])
+        print 'Win Rate:      %d/%d (%.2f)' % (wins.count(True), len(wins), winRate)
+        print 'Record:       ', ', '.join([ ['Loss', 'Win'][int(w)] for w in wins])
 
-    return games 
-
-def runner(params):
-    data_list = params[0]
-    ghost_value = params[1]
-    ghost_range = params[2]
-    food_value = params[3]
-    empty_value = params[4]
-    discount = params[5]
-    kwargs = readCommand(sys.argv[1:])
-    return runGames(ghost_value=ghost_value, ghost_range=ghost_range, data_list=data_list, **kwargs)
+    return games
 
 if __name__ == '__main__':
     """
@@ -692,32 +685,8 @@ if __name__ == '__main__':
 
     > python pacman.py --help
     """
-    starttime = time.time()
-    ghost_values = [x for x in range(-50, 0)]
-    ghost_ranges = [x for x in range(0, 13)]
-    food_values = [x for x in range(0, 50)]
-    empty_values = [x for x in range(-3, 3)]
-    discount = [float(x) / 100.0 for x in range(0, 100, 5)]
-
-    total = len(ghost_ranges) * len(ghost_values) * len(food_values) * len(empty_values) * len(discount)
-
-    data_list = Manager().list() 
-    import itertools
-    paramList = list(itertools.product((data_list,), ghost_values, ghost_ranges, food_values, empty_values, discount))
-    #pool = Pool()
-    import tqdm
-    from contextlib import closing
-    with closing(Pool(16)) as pool:
-        list(tqdm.tqdm(pool.imap(runner, paramList), total=total))
-        pool.terminate()
-    #pool.close()
-    
-    data = pandas.concat(data_list, ignore_index=True)
-    data.sort_values(by=['winrate'], inplace=True)
-    disp(data)
-    #data.to_pickle('myData.pkl')
-
-    print('That took {} seconds'.format(time.time() - starttime))
+    args = readCommand( sys.argv[1:] ) # Get game components based on input
+    runGames( **args )
 
     # import cProfile
     # cProfile.run("runGames( **args )")

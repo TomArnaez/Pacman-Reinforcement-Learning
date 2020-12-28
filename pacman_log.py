@@ -675,11 +675,11 @@ def runner(params):
     data_list = params[0]
     ghost_value = params[1]
     ghost_range = params[2]
-    #deadend_value = params[3]
+    deadend_value = params[3]
     #food_value = params[3]
-    discount = params[3]
+    discount = params[4]
     kwargs = readCommand(sys.argv[1:])
-    return runGames(ghost_value=ghost_value, ghost_range=ghost_range, data_list=data_list, discount=discount, **kwargs)
+    return runGames(ghost_value=ghost_value, ghost_range=ghost_range, deadend_value=deadend_value, data_list=data_list, discount=discount, **kwargs)
 
 if __name__ == '__main__':
     """
@@ -693,19 +693,17 @@ if __name__ == '__main__':
     > python pacman.py --help
     """
     starttime = time.time()
-    ghost_values = [x for x in range(-10, 0)]
-    #ghost_ranges = [x for x in range(0, 13)]
-    ghost_ranges = [x for x in range(10, 14)]
-    food_values = [x for x in range(0, 10)]
+    ghost_values = [x for x in range(-10, -1)]
+    ghost_ranges = [x for x in range(9, 14)]
+    #food_values = [x for x in range(0, 10)]
     deadend_values = [-x for x in range(0, 51, 10)]
-    #discount = [float(x) / 100.0 for x in range(0, 100, 10)]
     discount = [float(x) / 100.0 for x in range(50, 100, 10)]
 
-    total = len(ghost_ranges) * len(ghost_values) * len(discount)
+    total = len(ghost_ranges) * len(ghost_values) * len(discount) * len(deadend_values)
 
     data_list = Manager().list() 
     import itertools
-    paramList = list(itertools.product((data_list,), ghost_values, ghost_ranges, discount))
+    paramList = list(itertools.product((data_list,), ghost_values, ghost_ranges, deadend_values, discount))
     #pool = Pool()
     import tqdm
     from contextlib import closing

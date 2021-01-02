@@ -679,7 +679,7 @@ def runner(params):
     #food_value = params[3]
     discount = params[4]
     kwargs = readCommand(sys.argv[1:])
-    return runGames(ghost_value=ghost_value, ghost_range=ghost_range, deadend_value=deadend_value, data_list=data_list, discount=discount, **kwargs)
+    return runGames(ghost_value=ghost_value, ghost_range=ghost_range, data_list=data_list, deadend_value = deadend_value, discount=discount, **kwargs)
 
 if __name__ == '__main__':
     """
@@ -693,11 +693,11 @@ if __name__ == '__main__':
     > python pacman.py --help
     """
     starttime = time.time()
-    ghost_values = [x for x in range(-10, -1)]
-    ghost_ranges = [x for x in range(9, 14)]
+    ghost_values = [x for x in range(-12, -5)]
+    ghost_ranges = [x for x in range(9, 13)]
     #food_values = [x for x in range(0, 10)]
-    deadend_values = [-x for x in range(0, 51, 10)]
-    discount = [float(x) / 100.0 for x in range(50, 100, 10)]
+    deadend_values = [-x for x in range(10, 51, 10)]
+    discount = [float(x) / 100.0 for x in range(70, 100, 10)]
 
     total = len(ghost_ranges) * len(ghost_values) * len(discount) * len(deadend_values)
 

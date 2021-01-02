@@ -61,8 +61,6 @@ class MDPAgent(Agent):
         # Holds the set of all reachable locations.
         self.valid_locations = set((x, y) for x in range(self.width) for y in range(self.height) if (x, y) not in self.walls)
 
-        self.last_move_ghosts = api.ghostStatesWithTimes(state)
-
     def buildMap(self, state):
         """ 
         Builds an internal representation of the current game world using information gained from calls to the api
@@ -103,20 +101,9 @@ class MDPAgent(Agent):
 
         @returns dict: The reward values for positions
         """
-
         ghost_state_rewards = {}
-        ghost_directions = []
-        
-        # Find the current movement vector of the ghost by comparing its position to its position on the previous move.
-        for ghost, last_move_ghost in zip(self.ghosts, self.last_move_ghosts):
-            direction = (int(ghost[0][0]) - int(last_move_ghost[0][0]),
-                         int(ghost[0][1]) - int(last_move_ghost[0][1]))
-            if direction in DIRECTION_VECTORS.values():
-                ghost_directions.append(direction)
 
-        print(ghost_directions)
-
-        for ghost, ghost_direction in zip(self.ghosts, ghost_directions):
+        for ghost in self.ghosts:
             location = (int(ghost[0][0]), int(ghost[0][1]))
             timer = ghost[1]
 
@@ -133,8 +120,6 @@ class MDPAgent(Agent):
             for counter in range(1, self.values['ghost_range']):
                 while active_queue.isEmpty() is False:
                     pos = active_queue.pop()
-
-                    next_locs = []
 
                     # Add the adjacent locations of the ghost to the queue.
                     next_locs = [self.moveInDirection(pos, move) for move in self.getLegalMoves(pos)]
@@ -302,8 +287,6 @@ class MDPAgent(Agent):
 
         # Peform the modified policy iteration algorithm.
         self.modifiedPolicyIteration()
-
-        self.last_move_ghosts = self.ghosts
 
         # For debugging
         # self.display()

@@ -637,7 +637,7 @@ def replayGame( layout, actions, display ):
 
     display.finish()
 
-def runGames( layout, pacman, ghosts, display, numGames, record, data_list=None, numTraining = 0, catchExceptions=False, timeout=30, ghost_value=-50, ghost_range=12, food_value=1, empty_value=0, discount=0.5, deadend_value=-50.0):
+def runGames( layout, pacman, ghosts, display, numGames, record, data_list=None, numTraining = 0, catchExceptions=False, timeout=30, ghost_value=-50, ghost_range=12, food_value=1, empty_value=0, discount=0.5, deadend_value=-50.0, edible_ghost_value = 2):
     pacman.test(ghost_value=ghost_value, ghost_range = ghost_range, food_value=food_value, empty_value=empty_value, discount=discount, deadend_value=deadend_value)
     import __main__
     __main__.__dict__['_display'] = display
@@ -663,7 +663,7 @@ def runGames( layout, pacman, ghosts, display, numGames, record, data_list=None,
         scores = [game.state.getScore() for game in games]
         wins = [game.state.isWin() for game in games]
         winRate = wins.count(True)/ float(len(wins))
-        data_list.append(pandas.DataFrame({'ghost_value': [ghost_value], 'ghost_range':[ghost_range], 'food_value' : [food_value], 'empty_value':[empty_value], 'deadend_value':[deadend_value], 'discount':[discount], 'winrate': [winRate]}))
+        data_list.append(pandas.DataFrame({'ghost_value': [ghost_value], 'ghost_range':[ghost_range], 'food_value' : [food_value], 'empty_value':[empty_value], 'edible_ghost_value':[edible_ghost_value], 'discount':[discount], 'winrate': [winRate]}))
         # print 'Average Score:', sum(scores) / float(len(scores))
         # print 'Scores:       ', ', '.join([str(score) for score in scores])
         # print 'Win Rate:      %d/%d (%.2f)' % (wins.count(True), len(wins), winRate)
@@ -675,11 +675,12 @@ def runner(params):
     data_list = params[0]
     ghost_value = params[1]
     ghost_range = params[2]
-    deadend_value = params[3]
+    #deadend_value = params[3]
     #food_value = params[3]
-    discount = params[4]
+    #discount = params[3]
+    edible_ghost_value = params[3]
     kwargs = readCommand(sys.argv[1:])
-    return runGames(ghost_value=ghost_value, ghost_range=ghost_range, data_list=data_list, deadend_value = deadend_value, discount=discount, **kwargs)
+    return runGames(ghost_value=ghost_value, ghost_range=ghost_range, data_list=data_list, deadend_value = -50, discount=0.8, edible_ghost_value=edible_ghost_value, **kwargs)
 
 if __name__ == '__main__':
     """
@@ -693,21 +694,22 @@ if __name__ == '__main__':
     > python pacman.py --help
     """
     starttime = time.time()
-    ghost_values = [x for x in range(-12, -5)]
-    ghost_ranges = [x for x in range(9, 13)]
+    ghost_values = [x for x in range(-10, -5)]
+    ghost_ranges = [x for x in range(4, 10)]
+    edible_ghost_value = [x for x in range(1, 6)]
     #food_values = [x for x in range(0, 10)]
     deadend_values = [-x for x in range(10, 51, 10)]
     discount = [float(x) / 100.0 for x in range(70, 100, 10)]
 
-    total = len(ghost_ranges) * len(ghost_values) * len(discount) * len(deadend_values)
+    total = len(ghost_ranges) * len(ghost_values) * len(edible_ghost_value)
 
     data_list = Manager().list() 
     import itertools
-    paramList = list(itertools.product((data_list,), ghost_values, ghost_ranges, deadend_values, discount))
+    paramList = list(itertools.product((data_list,), ghost_values, ghost_ranges, edible_ghost_value))
     #pool = Pool()
     import tqdm
     from contextlib import closing
-    with closing(Pool(16)) as pool:
+    with closing(Pool(16-1)) as pool:
         list(tqdm.tqdm(pool.imap(runner, paramList), total=total))
         pool.terminate()
     #pool.close()

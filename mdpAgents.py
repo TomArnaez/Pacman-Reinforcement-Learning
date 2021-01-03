@@ -5,14 +5,12 @@ import random
 import util
 
 DIRECTION_VECTORS = {Directions.NORTH: (0,1), Directions.SOUTH: (0, -1), Directions.EAST: (1, 0), Directions.WEST: (-1, 0)}
-EPSILON = 0.01
-MEDIUM_MAP_SIZE = 220 #SMALL_MAP_VALUES = { 'ghost_value': -5.0, 'deadend': -30.0, 'food': 1.0, 'empty': 0.0, 'discount': 0.8, 'ghost_range':  13, 'iterations': 10 }
-SMALL_MAP_VALUES = { 'ghost_value': -6.0, 'edible_ghost_value': 5, 'deadend': -30.0, 'food': 1.0, 'empty': 0.0, 'discount': 0.8, 'ghost_range':  11, 'iterations': 10, 'capsule': 10.0}
-MEDIUM_MAP_VALUES = { 'ghost_value': -6.0, 'edible_ghost_value': 5,'deadend': -10.0, 'food': 1.0, 'empty': 0.0, 'discount': 0.7, 'ghost_range':  6, 'iterations': 10, 'capsule': 10.0}
-
+MEDIUM_MAP_SIZE = 220
+SMALL_MAP_VALUES = { 'ghost_value': -6.0, 'edible_ghost_value': 2, 'deadend': -30.0, 'food': 1.0, 'empty': 0.0, 'discount': 0.8, 'ghost_range':  12, 'iterations': 10, 'capsule': 5.0}
+MEDIUM_MAP_VALUES = { 'ghost_value': -10.0, 'edible_ghost_value': 1,'deadend': -10.0, 'food': 1.0, 'empty': 0.0, 'discount': 0.8, 'ghost_range':  5, 'iterations': 10, 'capsule': 5.0} 
 class MDPAgent(Agent):
 
-    def test(self, ghost_value=-50, ghost_range=12, food_value=1, empty_value=0, discount=0.6, deadend_value = -50.0):
+    def test(self, ghost_value=-50, ghost_range=12, food_value=1, empty_value=0, discount=0.6, deadend_value = -50.0, edible_ghost_value=2):
         """
         Method for modifying of global variables for testing purposes
         """
@@ -24,6 +22,7 @@ class MDPAgent(Agent):
         self.values['empty'] = empty_value
         self.values['discount'] = discount
         self.values['deadend'] = deadend_value
+        self.values['edible_ghost_value'] = edible_ghost_value
 
     def __init__(self):
         """
@@ -99,7 +98,7 @@ class MDPAgent(Agent):
         """
         Returns the reward values for locations relevant to ghosts.
         Uses a depth-limited breadth-first search to calculate reward values that are inversely proportional to the distance of nearby ghosts.
-        Considers deadends in its calculations as they are only dangerous when a ghost is nearby.
+        Deadends are considered here, as they are only dangerous when a ghost is nearby.
 
         @returns dict: The reward values for positions
         """
@@ -109,45 +108,50 @@ class MDPAgent(Agent):
         
         # Find the current movement vector of the ghost by comparing its position to its position on the previous move.
         for ghost, last_move_ghost in zip(self.ghosts, self.last_move_ghosts):
-            direction = (int(ghost[0][0]) - int(last_move_ghost[0][0]),
-                         int(ghost[0][1]) - int(last_move_ghost[0][1]))
-            if direction in DIRECTION_VECTORS.values():
+            # There seems to be a bug where sometimes ghost locations are returned as floats, even sometimes ending in .5 ... so use round.
+            direction = (int(round(ghost[0][0])) - int(round(last_move_ghost[0][0])),
+                         int(round(ghost[0][1])) - int(round(last_move_ghost[0][1])))
+            if direction in DIRECTION_VECTORS.values() or direction == (0, 0):
                 ghost_directions.append(direction)
 
-        print(ghost_directions)
-
         for ghost, ghost_direction in zip(self.ghosts, ghost_directions):
-            location = (int(ghost[0][0]), int(ghost[0][1]))
+            location = (int(round(ghost[0][0])), int(round(ghost[0][1])))
             timer = ghost[1]
 
-            # If the ghost is currently edible with time left, we give it a significant reward value.
+            # If the ghost is currently edible with enough time left, we give it a significant reward value and don't need to calculate a ghost danger reward.
             if timer > 2:
                 ghost_state_rewards[location] = self.values['edible_ghost_value']
                 continue
 
-            # Use of two queues to perform a breadth-first search.
+            # Two queue method to perform a breadth-first search where we swap the queues at each depth level.
             active_queue = util.Queue()
             inactive_queue = util.Queue()
-            active_queue.push(location)
+            active_queue.push((location, ghost_direction))
 
             for counter in range(1, self.values['ghost_range']):
                 while active_queue.isEmpty() is False:
-                    pos = active_queue.pop()
+                    pos, direction = active_queue.pop()
+                    # Multiply direction vector by -1 to get the reverse
+                    reverse_direction = ((direction[0] * -1, direction[1] * -1))
 
-                    next_locs = []
+                    reward_value = self.rewards[pos] + self.values['ghost_value'] * (1.0 / counter)
+                    
+                    # Get the adjacent locations and resulting new direction of the ghost.
+                    next_locs = [(self.moveInDirection(pos, move), DIRECTION_VECTORS[move]) for move in self.getLegalMoves(pos)]
 
-                    # Add the adjacent locations of the ghost to the queue.
-                    next_locs = [self.moveInDirection(pos, move) for move in self.getLegalMoves(pos)]
-                    for loc in next_locs:
-                        inactive_queue.push(loc)
+                    # If there is only one possible move we're in a deadend.
+                    if len(next_locs) == 1:
+                        # Only add a deadend penalty to this state if this isn't last food and pacman is not adjacent to it.
+                         if len(self.food) > 1 and util.manhattanDistance(self.pacman, pos) > 1:
+                            reward_value += self.values['deadend']
+                         inactive_queue.push(next_locs[0])
 
-                    # If there is only one possible move this most be a deadend.
-                    # Don't add a deadend penalty if this is the last food or pacman is adjacent to it.
-                    if (len(next_locs) == 1) and (len(self.food) > 1) and (util.manhattanDistance(self.pacman, pos) > 1):
-                         reward_value = self.rewards[pos] + self.values['deadend'] + self.values['ghost_value'] * (1.0 / counter)
-                    # No deadend so consider this a normal ghost-penalized state.
+                    # No deadend so consider this a normal ghost danger state
                     else:
-                         reward_value = self.rewards[pos] + self.values['ghost_value'] * (1.0 / counter)
+                         for loc in next_locs:
+                             # Ghosts never backtrack with other moves available so don't add the reverse.
+                             if loc[1] != reverse_direction:
+                                inactive_queue.push(loc)
 
                     # Ensure that we only replace a ghost value with more signifcant (negative) value.
                     if pos not in ghost_state_rewards or ghost_state_rewards[pos] > reward_value:
@@ -262,9 +266,8 @@ class MDPAgent(Agent):
                 # Check if the new policy produces a significant change in utility over the old policy.
                 if original_policy is not best_policy:
                     original_value = expectedValues[original_policy]
-                    if abs(max_value - original_value) > EPSILON:
-                        changed = True
-                        self.policies[location] = best_policy
+                    self.policies[location] = best_policy
+                    changed = True
 
     def display(self, info=None):       
         """
@@ -303,6 +306,7 @@ class MDPAgent(Agent):
         # Peform the modified policy iteration algorithm.
         self.modifiedPolicyIteration()
 
+        # Needed to caculate new ghost directions.
         self.last_move_ghosts = self.ghosts
 
         # For debugging

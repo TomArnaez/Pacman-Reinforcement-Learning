@@ -677,10 +677,10 @@ def runner(params):
     ghost_range = params[2]
     #deadend_value = params[3]
     #food_value = params[3]
-    #discount = params[3]
     edible_ghost_value = params[3]
+    discount = params[4]
     kwargs = readCommand(sys.argv[1:])
-    return runGames(ghost_value=ghost_value, ghost_range=ghost_range, data_list=data_list, deadend_value = -50, discount=0.8, edible_ghost_value=edible_ghost_value, **kwargs)
+    return runGames(ghost_value=ghost_value, ghost_range=ghost_range, data_list=data_list, deadend_value = -50, discount=discount, edible_ghost_value=edible_ghost_value, **kwargs)
 
 if __name__ == '__main__':
     """
@@ -695,17 +695,17 @@ if __name__ == '__main__':
     """
     starttime = time.time()
     ghost_values = [x for x in range(-10, -5)]
-    ghost_ranges = [x for x in range(4, 10)]
-    edible_ghost_value = [x for x in range(1, 6)]
+    ghost_ranges = [x for x in range(3, 7)]
+    edible_ghost_value = [x for x in range(1, 5)]
     #food_values = [x for x in range(0, 10)]
     deadend_values = [-x for x in range(10, 51, 10)]
     discount = [float(x) / 100.0 for x in range(70, 100, 10)]
 
-    total = len(ghost_ranges) * len(ghost_values) * len(edible_ghost_value)
+    total = len(ghost_ranges) * len(ghost_values) * len(edible_ghost_value) * len(discount)
 
     data_list = Manager().list() 
     import itertools
-    paramList = list(itertools.product((data_list,), ghost_values, ghost_ranges, edible_ghost_value))
+    paramList = list(itertools.product((data_list,), ghost_values, ghost_ranges, edible_ghost_value, discount))
     #pool = Pool()
     import tqdm
     from contextlib import closing

@@ -10,25 +10,10 @@ SMALL_MAP_VALUES = { 'ghost_value': -6.0, 'edible_ghost_value': 2, 'deadend': -3
 MEDIUM_MAP_VALUES = { 'ghost_value': -10.0, 'edible_ghost_value': 1,'deadend': -10.0, 'food': 1.0, 'empty': 0.0, 'discount': 0.8, 'ghost_range':  5, 'iterations': 10, 'capsule': 5.0} 
 class MDPAgent(Agent):
 
-    def test(self, ghost_value=-50, ghost_range=12, food_value=1, empty_value=0, discount=0.6, deadend_value = -50.0, edible_ghost_value=2):
-        """
-        Method for modifying of global variables for testing purposes
-        """
-        self.values = SMALL_MAP_VALUES
-        self.testing = True
-        self.values['ghost_value'] = ghost_value
-        self.values['ghost_range'] = ghost_range
-        self.values['food'] = food_value
-        self.values['empty'] = empty_value
-        self.values['discount'] = discount
-        self.values['deadend'] = deadend_value
-        self.values['edible_ghost_value'] = edible_ghost_value
-
     def __init__(self):
         """
         Constructor to initialise the dictionaries to be used on the bellman's.
         """
-        self.testing = False
         self.rewards = {}
         self.utilities = {}
         self.stateNeighbours = {}
@@ -43,7 +28,6 @@ class MDPAgent(Agent):
         # Set constant world values.
         self.corners = api.corners(state)
         self.walls = api.walls(state)
-        self.original_food_count = len(api.food(state))
 
         # Calculate the width and height using the corners.
         from operator import itemgetter
@@ -51,11 +35,10 @@ class MDPAgent(Agent):
         self.width= max(self.corners, key=itemgetter(0))[0] + 1
 
         # Set values to be used depending on map size.
-        if not self.testing:
-            if self.width * self.height < MEDIUM_MAP_SIZE:
-                self.values = SMALL_MAP_VALUES
-            else:
-                self.values = MEDIUM_MAP_VALUES
+        if self.width * self.height < MEDIUM_MAP_SIZE:
+            self.values = SMALL_MAP_VALUES
+        else:
+            self.values = MEDIUM_MAP_VALUES
 
         # Holds the set of all reachable locations.
         self.valid_locations = set((x, y) for x in range(self.width) for y in range(self.height) if (x, y) not in self.walls)
@@ -111,7 +94,7 @@ class MDPAgent(Agent):
             # There seems to be a bug where sometimes ghost locations are returned as floats, even sometimes ending in .5 ... so use round.
             direction = (int(round(ghost[0][0])) - int(round(last_move_ghost[0][0])),
                          int(round(ghost[0][1])) - int(round(last_move_ghost[0][1])))
-            if direction in DIRECTION_VECTORS.values() or direction == (0, 0):
+            if direction == (0, 0) or direction in DIRECTION_VECTORS.values():
                 ghost_directions.append(direction)
 
         for ghost, ghost_direction in zip(self.ghosts, ghost_directions):
@@ -234,7 +217,7 @@ class MDPAgent(Agent):
         import copy
         new_utilities = copy.deepcopy(self.utilities)
 
-        # We iterate so long as there is significant (> epsilon) change.
+        # Iterate until the policy map converges
         changed = True
         while changed:
             changed = False 
@@ -268,7 +251,6 @@ class MDPAgent(Agent):
                     original_value = expectedValues[original_policy]
                     self.policies[location] = best_policy
                     changed = True
-
     def display(self, info=None):       
         """
         Neatly prints the current map.
